@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>🖐️ App Infantil de Señas</title>
+  <style>
+    body {
+      font-family: 'Comic Sans MS', sans-serif;
+      text-align: center;
+      background: linear-gradient(to bottom, #b8ecff, #e3ffe0);
+      margin: 0;
+      padding: 0;
+    }
+
+    header {
+      background-color: #7ad7f0;
+      padding: 15px 0;
+      font-size: 26px;
+      font-weight: bold;
+      color: #04364A;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    }
+
+    video {
+      width: 360px;
+      height: 280px;
+      background: #000;
+      border-radius: 20px;
+      border: 3px solid #2dd4bf;
+      transform: scaleX(-1);
+      margin-top: 20px;
+      box-shadow: 0 0 15px rgba(0,0,0,0.2);
+    }
+
+    #label {
+      font-size: 22px;
+      font-weight: bold;
+      margin-top: 20px;
+      color: #04364A;
+    }
+
+    #output {
+      width: 340px;
+      height: 130px;
+      border: 2px dashed #00bcd4;
+      border-radius: 10px;
+      margin: 15px auto;
+      padding: 10px;
+      text-align: left;
+      font-size: 18px;
+      overflow-y: auto;
+      background-color: #f7fff7;
+      color: #04364A;
+    }
+
+    button {
+      background-color: #14b8a6;
+      color: white;
+      font-size: 16px;
+      border: none;
+      border-radius: 10px;
+      padding: 10px 25px;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    button:hover { background-color: #0d9488; }
+
+    footer {
+      margin-top: 15px;
+      font-size: 14px;
+      color: #04364A;
+    }
+
+   .decor {
+  position: absolute;
+  width: 300px;         /* 🔹 Aumenta el tamaño de las imágenes */
+  opacity: 0.95;        /* Un poco más visible */
+  transition: transform 0.3s ease;
+}
+
+.decor:hover {
+  transform: scale(1.1); /* 🔹 Pequeña animación al pasar el mouse */
+}
+
+/* Imagen del lado izquierdo */
+.left {
+  left: 80px;           /* 🔹 Más separada del video */
+  top: 250px;           /* 🔹 Ajusta la altura */
+}
+
+/* Imagen del lado derecho */
+.right {
+  right: 80px;          /* 🔹 Igual separación hacia el otro lado */
+  top: 250px;
+}
+
+    @media (max-width: 768px) {
+      .decor { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <header>🖐️ App Lenguaje de Señas</header>
+
+  <!-- Imágenes decorativas de manos o señas (sin agregar archivos locales) -->
+  <img class="decor left" src="https://cdn.pixabay.com/photo/2013/07/13/11/52/beckoning-158863_1280.png" alt="mano izquierda">
+  <img class="decor right" src="https://cdn.pixabay.com/photo/2016/04/01/08/27/alphabet-1298713_1280.png" alt="mano derecha">
+
+  <video id="video" autoplay playsinline></video>
+  <div id="label">👀 Esperando seña clara...</div>
+  <div id="output"></div>
+  <button onclick="clearText()">🗑️ Limpiar texto</button>
+
+  <footer>🌟 Proyecto educativo de reconocimiento de señas | Versión prototipo</footer>
+
+  <!-- TensorFlow + Teachable Machine -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.8.0"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8/dist/teachablemachine-image.min.js"></script>
+
+  <script>
+    const video = document.getElementById('video');
+    const label = document.getElementById('label');
+    const output = document.getElementById('output');
+    let model, maxPredictions;
+    let lastPrediction = '';
+    let cooldown = false;
+
+    async function startCamera() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        video.srcObject = stream;
+        label.textContent = '📷 Cámara activada. Cargando modelo...';
+        await initModel();
+      } catch (err) {
+        label.textContent = '❌ Error cámara: ' + err.message;
+      }
+    }
+
+    async function initModel() {
+      const modelURL = "model/model.json";
+      const metadataURL = "model/metadata.json";
+      model = await tmImage.load(modelURL, metadataURL);
+      maxPredictions = model.getTotalClasses();
+      label.textContent = '✅ Modelo cargado correctamente';
+      predictLoop();
+    }
+
+    async function predictLoop() {
+      const prediction = await model.predict(video);
+      let bestClass = prediction[0].className;
+      let bestProb = prediction[0].probability;
+
+      for (let i = 1; i < maxPredictions; i++) {
+        if (prediction[i].probability > bestProb) {
+          bestProb = prediction[i].probability;
+          bestClass = prediction[i].className;
+        }
+      }
+
+      label.textContent = `🤚 Seña detectada: ${bestClass} (${(bestProb * 100).toFixed(1)}%)`;
+
+      if (!cooldown && bestProb > 0.80 && bestClass !== lastPrediction) {
+        lastPrediction = bestClass;
+        appendText(bestClass);
+        cooldown = true;
+        setTimeout(() => { cooldown = false; }, 2000); // 2 segundos entre detecciones
+      }
+
+      requestAnimationFrame(predictLoop);
+    }
+
+    function appendText(word) {
+      output.textContent += word + ' ';
+    }
+
+    function clearText() {
+      output.textContent = '';
+      lastPrediction = '';
+    }
+
+    startCamera();
+  </script>
+</body>
+</html>
